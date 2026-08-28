@@ -1,0 +1,33 @@
+{
+  "name": "snapline-screenshot-extension",
+  "version": "0.1.0",
+  "description": "A private, local-first Chrome screenshot extension.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "icons": "node scripts/generate-icons.mjs",
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/chrome": "^0.0.326",
+    "@types/node": "^24.1.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.6",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "preact": "^10.29.7"
+  }
+}

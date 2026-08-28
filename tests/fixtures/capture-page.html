@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snapline capture fixture</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * { box-sizing: border-box; }
+      html { overflow-y: scroll; }
+      html, body { margin: 0; font-family: Arial, sans-serif; color: #152238; }
+      html::-webkit-scrollbar { width: 16px; }
+      html::-webkit-scrollbar-track { background: #fecaca; }
+      html::-webkit-scrollbar-thumb { background: #dc2626; }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        height: 64px;
+        padding: 0 40px;
+        border-bottom: 1px solid #d8e0eb;
+        background: white;
+        font-weight: 700;
+      }
+      section {
+        display: grid;
+        min-height: 720px;
+        padding: 70px 10vw;
+        place-items: center;
+      }
+      section:nth-of-type(1) { background: #eff6ff; }
+      section:nth-of-type(2) { background: #ffffff; }
+      section:nth-of-type(3) { background: #e8eef7; }
+      .target {
+        width: min(620px, 80vw);
+        padding: 48px;
+        border: 2px solid #2563eb;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 20px 50px rgb(15 23 42 / 12%);
+      }
+      h1 { margin: 0 0 16px; font-size: 42px; }
+      p { margin: 0; color: #53647d; font-size: 18px; line-height: 1.6; }
+      .lazy-image {
+        width: 320px;
+        height: 180px;
+        background: #ef4444;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header data-test-sticky>Snapline fixture</header>
+    <section>
+      <div class="target" data-test-target>
+        <h1>Capture this area</h1>
+        <p>A stable page for area, viewport, and tall-page screenshot tests.</p>
+      </div>
+    </section>
+    <section><h1>Second section</h1></section>
+    <section>
+      <div>
+        <h1>Lazy section</h1>
+        <img
+          class="lazy-image"
+          id="lazy-image"
+          width="320"
+          height="180"
+          alt="Lazy-loaded test pattern"
+        />
+      </div>
+    </section>
+    <section><h1>Final section</h1></section>
+    <script>
+      const lazyImage = document.getElementById("lazy-image");
+      const loadWhenNear = () => {
+        const rect = lazyImage.getBoundingClientRect();
+        if (!lazyImage.getAttribute("src") && rect.top < innerHeight * 1.5) {
+          lazyImage.src = "/lazy-image.svg";
+        }
+      };
+      addEventListener("scroll", loadWhenNear, { passive: true });
+      loadWhenNear();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Selector harness</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; font-family: Arial, sans-serif; color: #152238; }
+      header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        align-items: center;
+        height: 64px;
+        padding: 0 40px;
+        border-bottom: 1px solid #d8e0eb;
+        background: white;
+        font-weight: 700;
+      }
+      main {
+        display: grid;
+        min-height: calc(100vh - 64px);
+        padding: 70px 10vw;
+        place-items: center;
+        background: #eff6ff;
+      }
+      .target {
+        width: min(620px, 80vw);
+        padding: 48px;
+        border: 2px solid #2563eb;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 20px 50px rgb(15 23 42 / 12%);
+      }
+      h1 { margin: 0 0 16px; font-size: 42px; }
+      p { margin: 0; color: #53647d; font-size: 18px; line-height: 1.6; }
+      #result {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        z-index: 2147483646;
+        padding: 8px 10px;
+        border-radius: 7px;
+        background: #0f172a;
+        color: white;
+        font-size: 12px;
+      }
+    </style>
+    <script>
+      window.__contentListener = null;
+      window.chrome = {
+        runtime: {
+          onMessage: {
+            addListener(listener) {
+              window.__contentListener = listener;
+            }
+          },
+          async sendMessage(message) {
+            if (message.type === "AREA_SELECTED") {
+              const result = document.getElementById("result");
+              result.textContent =
+                `Selected ${Math.round(message.rect.width)} × ${Math.round(message.rect.height)}`;
+              result.dataset.complete = "true";
+            }
+            return { ok: true };
+          }
+        }
+      };
+    </script>
+  </head>
+  <body>
+    <header>Snapline selector test</header>
+    <main>
+      <section class="target" data-test-target>
+        <h1>Capture this area</h1>
+        <p>The compiled selector is running with a local extension API stub.</p>
+      </section>
+    </main>
+    <div id="result">Selector ready</div>
+    <script src="/dist/content.js"></script>
+    <script>
+      window.__contentListener(
+        { target: "content", type: "START_AREA" },
+        {},
+        () => {}
+      );
+
+      const state = new URLSearchParams(location.search).get("state");
+      if (state === "dragging" || state === "complete") {
+        const host = document.querySelector('[data-snapline-ui="area"]');
+        host.setPointerCapture = () => {};
+        host.hasPointerCapture = () => false;
+        host.releasePointerCapture = () => {};
+        host.dispatchEvent(
+          new PointerEvent("pointerdown", {
+            bubbles: true,
+            pointerId: 1,
+            button: 0,
+            clientX: 320,
+            clientY: 360
+          })
+        );
+        host.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            pointerId: 1,
+            button: 0,
+            clientX: 880,
+            clientY: 500
+          })
+        );
+        const selection = host.shadowRoot.querySelector(".selection");
+        if (selection.style.display !== "block") {
+          throw new Error("Synthetic drag did not activate the selection.");
+        }
+        if (state === "complete") {
+          host.dispatchEvent(
+            new PointerEvent("pointerup", {
+              bubbles: true,
+              pointerId: 1,
+              button: 0,
+              clientX: 880,
+              clientY: 500
+            })
+          );
+        }
+      }
+    </script>
+  </body>
+</html>

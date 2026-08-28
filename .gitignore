@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+work/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+*.crx
+*.zip

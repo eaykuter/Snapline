@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Full-page content harness</title>
+    <link rel="icon" href="data:," />
+    <style>
+      html { overflow-y: scroll; }
+      html, body { margin: 0; font-family: Arial, sans-serif; }
+      html::-webkit-scrollbar { width: 16px; }
+      html::-webkit-scrollbar-track { background: #fecaca; }
+      html::-webkit-scrollbar-thumb { background: #dc2626; }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        height: 64px;
+        padding: 20px 32px;
+        background: white;
+        border-bottom: 1px solid #dbe3ee;
+        font-weight: 700;
+      }
+      section {
+        display: grid;
+        min-height: 720px;
+        padding: 40px;
+        place-items: center;
+        font-size: 42px;
+        font-weight: 700;
+      }
+      section:nth-of-type(1) { background: #eff6ff; }
+      section:nth-of-type(2) { background: #fff; }
+      section:nth-of-type(3) { background: #e8eef7; }
+      #result {
+        position: fixed;
+        left: 18px;
+        bottom: 18px;
+        z-index: 2147483646;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #101828;
+        color: white;
+        font-size: 13px;
+      }
+      #lazy-image {
+        width: 320px;
+        height: 180px;
+        background: #ef4444;
+      }
+      #finite-animation {
+        width: 1px;
+        height: 1px;
+        animation: harness-fade-in 120ms both;
+      }
+      @keyframes harness-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+    </style>
+    <script>
+      window.__contentListener = null;
+      window.chrome = {
+        runtime: {
+          onMessage: {
+            addListener(listener) {
+              window.__contentListener = listener;
+            }
+          },
+          async sendMessage() {
+            return { ok: true };
+          }
+        }
+      };
+    </script>
+  </head>
+  <body>
+    <header id="sticky">Sticky header</header>
+    <section>First section</section>
+    <section>Second section</section>
+    <section>
+      <div>
+        <div>Lazy section</div>
+        <img id="lazy-image" width="320" height="180" alt="Lazy-loaded test pattern" />
+      </div>
+    </section>
+    <section>Final section</section>
+    <div id="result">Running full-page DOM checks…</div>
+    <script src="/dist/content.js"></script>
+    <script type="module">
+      const jobId = crypto.randomUUID();
+      const invoke = (message) =>
+        new Promise((resolve) => {
+          window.__contentListener(message, {}, resolve);
+        });
+      const lazyImage = document.getElementById("lazy-image");
+      const createTestVideo = ({ fallback = false, initialTime = 0 } = {}) => {
+        const wrapper = document.createElement("div");
+        let currentTime = initialTime;
+        const video = document.createElement("video");
+        let paused = false;
+        video.style.display = "none";
+        Object.defineProperty(video, "paused", {
+          configurable: true,
+          get: () => paused
+        });
+        Object.defineProperty(video, "pause", {
+          configurable: true,
+          value: () => {
+            paused = true;
+          }
+        });
+        Object.defineProperty(video, "play", {
+          configurable: true,
+          value: () => {
+            paused = false;
+            video.dispatchEvent(new Event("play"));
+            return Promise.resolve();
+          }
+        });
+        Object.defineProperty(video, "readyState", {
+          configurable: true,
+          get: () => HTMLMediaElement.HAVE_METADATA
+        });
+        Object.defineProperty(video, "currentTime", {
+          configurable: true,
+          get: () => currentTime,
+          set: (value) => {
+            currentTime = Number(value);
+            video.dispatchEvent(new Event("seeked"));
+            video.dispatchEvent(new Event("timeupdate"));
+          }
+        });
+        let fallbackElement = null;
+        if (fallback) {
+          fallbackElement = document.createElement("picture");
+          fallbackElement.className = "fallback-frame";
+          fallbackElement.style.display = "none";
+          const emptySource = document.createElement("source");
+          emptySource.dataset.empty = "";
+          emptySource.media = "(min-width: 0px)";
+          emptySource.srcset =
+            "data:image/gif;base64,R0lGODlhAQABAHAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+          fallbackElement.append(emptySource);
+          const image = document.createElement("img");
+          image.alt = "Video fallback";
+          image.src =
+            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3Crect width='1' height='1' fill='black'/%3E%3C/svg%3E";
+          fallbackElement.append(image);
+          wrapper.append(fallbackElement);
+        }
+        wrapper.append(video);
+        document.body.append(wrapper);
+        return {
+          element: video,
+          fallbackElement,
+          fallbackImage: fallbackElement?.querySelector("img") ?? null,
+          isPaused: () => paused,
+          currentTime: () => currentTime
+        };
+      };
+      const video = createTestVideo({ initialTime: 2 });
+      const fallbackVideo = createTestVideo({ fallback: true, initialTime: 3 });
+      const finiteAnimation = document.createElement("div");
+      finiteAnimation.id = "finite-animation";
+      document.body.append(finiteAnimation);
+      const loadWhenNear = () => {
+        const rect = lazyImage.getBoundingClientRect();
+        if (!lazyImage.getAttribute("src") && rect.top < innerHeight * 1.5) {
+          lazyImage.src = "/lazy-image.svg";
+        }
+      };
+      addEventListener("scroll", loadWhenNear, { passive: true });
+      loadWhenNear();
+
+      try {
+        window.scrollTo(0, innerHeight * 2);
+        const originalScrollY = window.scrollY;
+        const prepared = await invoke({
+          target: "content",
+          type: "PREPARE_FULL",
+          jobId
+        });
+        if (!prepared.ok || prepared.data.documentHeight <= innerHeight) {
+          throw new Error("The frozen full-page extent was not measured.");
+        }
+        if (window.scrollY !== 0) {
+          throw new Error("Preparation performed an unexpected scroll pass.");
+        }
+        if (!lazyImage.getAttribute("src")) {
+          throw new Error("Warm-up did not trigger lazy content.");
+        }
+        if (getComputedStyle(finiteAnimation).opacity !== "1") {
+          throw new Error("The finite animation did not settle before capture.");
+        }
+        if (!video.isPaused()) {
+          throw new Error("The initial video was not paused for capture.");
+        }
+        if (video.currentTime() !== 0) {
+          throw new Error("The video without a fallback was not reset to frame one.");
+        }
+        if (
+          !fallbackVideo.element.hasAttribute("data-snapline-video-hidden") ||
+          getComputedStyle(fallbackVideo.fallbackElement).display === "none" ||
+          fallbackVideo.fallbackImage.currentSrc.includes("R0lGODlh")
+        ) {
+          throw new Error("The available video fallback was not shown.");
+        }
+        video.element.play();
+        if (!video.isPaused()) {
+          throw new Error("Capture did not hold the initial video paused.");
+        }
+        const scrollbar = getComputedStyle(
+          document.documentElement,
+          "::-webkit-scrollbar"
+        );
+        if (scrollbar.display !== "none" && scrollbar.width !== "0px") {
+          throw new Error("The page scrollbar was not hidden for capture.");
+        }
+        if (prepared.data.contentWidth !== innerWidth) {
+          throw new Error(
+            `Capture width ${prepared.data.contentWidth} did not match viewport ${innerWidth}.`
+          );
+        }
+
+        const lateVideo = createTestVideo();
+        const first = await invoke({
+          target: "content",
+          type: "SCROLL_FULL",
+          jobId,
+          y: 0,
+          tileIndex: 0,
+          tileCount: 3
+        });
+        if (!first.ok || first.data.actualY !== 0) {
+          throw new Error("The first tile did not scroll to the top.");
+        }
+        if (document.getElementById("sticky").style.visibility === "hidden") {
+          throw new Error("The sticky header was hidden from the first tile.");
+        }
+        if (!lateVideo.isPaused()) {
+          throw new Error("A video inserted during capture was not paused.");
+        }
+        lateVideo.element.play();
+        if (!lateVideo.isPaused()) {
+          throw new Error("Capture did not hold an inserted video paused.");
+        }
+
+        if (document.querySelector('[data-snapline-ui="progress"]')) {
+          throw new Error("Capture progress was injected into the page.");
+        }
+
+        const secondPromise = invoke({
+          target: "content",
+          type: "SCROLL_FULL",
+          jobId,
+          y: innerHeight * 2,
+          tileIndex: 1,
+          tileCount: 3
+        });
+        const second = await secondPromise;
+        if (!second.ok || second.data.actualY <= 0) {
+          throw new Error("The second tile did not scroll.");
+        }
+        if (!lazyImage.complete || lazyImage.naturalWidth === 0) {
+          throw new Error("Lazy content was not loaded during the capture pass.");
+        }
+        if (document.getElementById("sticky").style.visibility !== "hidden") {
+          throw new Error("The duplicated sticky header was not hidden.");
+        }
+        await invoke({
+          target: "content",
+          type: "RESTORE_FULL",
+          jobId
+        });
+        if (document.getElementById("sticky").style.visibility === "hidden") {
+          throw new Error("Sticky element styles were not restored.");
+        }
+        if (Math.abs(window.scrollY - originalScrollY) > 1) {
+          throw new Error(
+            `Scroll restored to ${window.scrollY}, expected ${originalScrollY}.`
+          );
+        }
+        if (video.isPaused() || lateVideo.isPaused()) {
+          throw new Error("Video playback was not restored after capture.");
+        }
+        if (video.currentTime() !== 2 || fallbackVideo.currentTime() !== 3) {
+          throw new Error("Video positions were not restored after capture.");
+        }
+        if (
+          fallbackVideo.element.hasAttribute("data-snapline-video-hidden") ||
+          fallbackVideo.fallbackElement.hasAttribute(
+            "data-snapline-fallback-visible"
+          ) ||
+          !fallbackVideo.fallbackImage.currentSrc.includes("R0lGODlh") ||
+          getComputedStyle(fallbackVideo.fallbackElement).display !== "none"
+        ) {
+          throw new Error("The video fallback state was not restored.");
+        }
+
+        const cancellationJobId = crypto.randomUUID();
+        const cancellationScrollY = window.scrollY;
+        const cancellationVideoTime = video.currentTime();
+        const preparationScrolled = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            removeEventListener("scroll", onScroll);
+            reject(new Error("Cancellation test did not reach warm-up scrolling."));
+          }, 3_000);
+          const onScroll = () => {
+            if (Math.abs(window.scrollY - cancellationScrollY) <= 1) {
+              return;
+            }
+            clearTimeout(timeout);
+            removeEventListener("scroll", onScroll);
+            dispatchEvent(
+              new KeyboardEvent("keydown", {
+                key: "Escape",
+                bubbles: true,
+                cancelable: true
+              })
+            );
+            resolve();
+          };
+          addEventListener("scroll", onScroll, { passive: true });
+        });
+        const cancelledPreparation = invoke({
+          target: "content",
+          type: "PREPARE_FULL",
+          jobId: cancellationJobId
+        });
+        await preparationScrolled;
+        const cancelled = await cancelledPreparation;
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        if (cancelled.ok) {
+          throw new Error("Cancelled preparation unexpectedly completed.");
+        }
+        if (Math.abs(window.scrollY - cancellationScrollY) > 1) {
+          throw new Error("Cancelled warm-up changed the restored scroll position.");
+        }
+        if (document.querySelector('[data-snapline-ui="freeze"]')) {
+          throw new Error("Cancelled warm-up left capture styles behind.");
+        }
+        if (document.getElementById("sticky").style.visibility === "hidden") {
+          throw new Error("Cancelled warm-up changed sticky element styles.");
+        }
+        if (video.isPaused() || video.currentTime() !== cancellationVideoTime) {
+          throw new Error("Cancelled warm-up changed restored video playback.");
+        }
+        const result = document.getElementById("result");
+        result.dataset.state = "pass";
+        result.textContent =
+          `Full-page DOM and cancellation restored · ${prepared.data.documentHeight.toLocaleString()} px frozen extent`;
+      } catch (error) {
+        const result = document.getElementById("result");
+        result.dataset.state = "fail";
+        result.textContent = error instanceof Error ? error.message : String(error);
+      }
+    </script>
+  </body>
+</html>

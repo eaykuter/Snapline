@@ -1,0 +1,225 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../popup.html";
+@source "../preview.html";
+@source "./popup.tsx";
+@source "./preview.tsx";
+@source "./ui";
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url("/fonts/ibm-plex-sans-light.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/fonts/ibm-plex-sans-regular.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("/fonts/ibm-plex-sans-medium.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("/fonts/ibm-plex-sans-semibold.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "IBM Plex Sans";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("/fonts/ibm-plex-sans-bold.woff2") format("woff2");
+}
+
+@theme {
+    --color-*: initial;
+    --color-white: #ffffff;
+    --color-transparent: transparent;
+}
+
+@theme inline {
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-accent-focus: var(--accent-focus);
+    --color-accent-ring: var(--accent-ring);
+    --color-content: var(--text);
+    --color-muted: var(--muted);
+    --color-line: var(--border);
+    --color-line-strong: var(--border-strong);
+    --color-surface: var(--surface);
+    --color-surface-hover: var(--surface-hover);
+    --color-shortcut: var(--shortcut-bg);
+    --color-shortcut-line: var(--shortcut-border);
+    --color-stage: var(--stage);
+    --color-toolbar: var(--toolbar-background);
+    --color-icon: var(--icon);
+    --color-progress-track: var(--progress-track);
+    --color-image-line: var(--image-border);
+    --color-image: var(--image-background);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --radius-control: var(--control-radius);
+    --shadow-control: var(--secondary-control-shadow);
+    --shadow-control-hover: var(--secondary-control-shadow-hover);
+    --shadow-control-primary: var(--primary-control-shadow);
+    --shadow-control-primary-hover: var(--primary-control-shadow-hover);
+    --shadow-preview: var(--shadow);
+    --animate-capture-pulse: capture-pulse 1.4s ease-in-out infinite;
+    --animate-process-progress: process-progress 1.15s ease-in-out infinite;
+    --animate-spinner: spin 700ms linear infinite;
+}
+
+:root {
+    color-scheme: light;
+    color: #171717;
+    background: #ffffff;
+    font-synthesis: none;
+    --font-ui:
+        "IBM Plex Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-focus: rgb(37 99 235 / 20%);
+    --accent-ring: rgb(37 99 235 / 16%);
+    --text: #171717;
+    --muted: #737373;
+    --border: #e5e5e5;
+    --border-strong: #a3a3a3;
+    --surface: #ffffff;
+    --surface-hover: #f5f5f5;
+    --shortcut-bg: #f5f5f5;
+    --shortcut-border: #e5e5e5;
+    --stage: #f5f5f5;
+    --toolbar-background: rgb(255 255 255 / 94%);
+    --icon: #262626;
+    --progress-track: #e5e5e5;
+    --image-border: #d4d4d4;
+    --image-background: #ffffff;
+    --danger: #b42318;
+    --danger-soft: #fff1f0;
+    --shadow: 0 12px 34px rgb(23 23 23 / 10%);
+    --secondary-control-shadow: inset 0 -2px 0 rgb(115 115 115 / 10%);
+    --secondary-control-shadow-hover: inset 0 0 0 rgb(115 115 115 / 0%);
+    --primary-control-shadow:
+        inset 0 -2px 0 #1e40af,
+        0 1px 3px #dbeafe;
+    --primary-control-shadow-hover:
+        inset 0 0 0 rgb(30 64 175 / 0%),
+        0 0 0 rgb(219 234 254 / 0%);
+    --control-radius: 3px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+@layer base {
+    button,
+    kbd {
+        font: inherit;
+    }
+
+    button {
+        color: inherit;
+    }
+}
+
+.popup-body,
+.preview-body {
+    font-family: var(--font-ui);
+}
+
+@keyframes capture-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+
+    50% {
+        box-shadow: 0 0 0 5px var(--accent-focus);
+    }
+}
+
+@keyframes process-progress {
+    from {
+        transform: translateX(-120%);
+    }
+
+    to {
+        transform: translateX(320%);
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        color: #f4f4f5;
+        background: #18181b;
+        --accent: #2563eb;
+        --accent-hover: #1d4ed8;
+        --accent-focus: rgb(37 99 235 / 25%);
+        --accent-ring: rgb(37 99 235 / 16%);
+        --text: #f4f4f5;
+        --muted: #a1a1aa;
+        --border: #3f3f46;
+        --border-strong: #52525b;
+        --surface: #18181b;
+        --surface-hover: #27272a;
+        --shortcut-bg: #27272a;
+        --shortcut-border: #3f3f46;
+        --stage: #09090b;
+        --toolbar-background: rgb(24 24 27 / 94%);
+        --icon: #e4e4e7;
+        --progress-track: #3f3f46;
+        --image-border: #3f3f46;
+        --image-background: #ffffff;
+        --danger: #fca5a5;
+        --danger-soft: rgb(252 165 165 / 12%);
+        --shadow: 0 14px 38px rgb(0 0 0 / 30%);
+        --secondary-control-shadow: inset 0 -2px 0 rgb(212 212 216 / 8%);
+        --secondary-control-shadow-hover: inset 0 0 0 rgb(212 212 216 / 0%);
+        --primary-control-shadow:
+            inset 0 -2px 0 #1e3a8a,
+            0 1px 3px rgb(0 0 0 / 40%);
+        --primary-control-shadow-hover:
+            inset 0 0 0 rgb(30 58 138 / 0%),
+            0 0 0 rgb(0 0 0 / 0%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

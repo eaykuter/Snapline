@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image pipeline harness</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 40px;
+        background: #f4f7fb;
+        color: #0f172a;
+        font-family: Arial, sans-serif;
+      }
+      main { max-width: 760px; margin: 0 auto; }
+      h1 { margin: 0 0 8px; }
+      p { color: #64748b; }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 10px 0;
+        padding: 12px;
+        border: 1px solid #dbe3ee;
+        border-radius: 8px;
+        background: white;
+      }
+      .check[data-state="pass"]::before {
+        content: "✓";
+        color: #067647;
+        font-weight: 700;
+      }
+      .check[data-state="fail"]::before {
+        content: "×";
+        color: #b42318;
+        font-weight: 700;
+      }
+      #preview {
+        display: block;
+        max-width: 100%;
+        margin-top: 24px;
+        border: 1px solid #dbe3ee;
+        background: white;
+      }
+      #preview-link {
+        display: inline-block;
+        margin-top: 18px;
+        color: #2563eb;
+        font-weight: 700;
+      }
+    </style>
+    <script>
+      window.__offscreenListener = null;
+      window.chrome = {
+        runtime: {
+          onMessage: {
+            addListener(listener) {
+              window.__offscreenListener = listener;
+            }
+          }
+        }
+      };
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Compiled image pipeline</h1>
+      <p>Area crop, IndexedDB persistence, streamed tall PNG, and final-row recovery checks.</p>
+      <div class="check" id="crop-check">Running area crop…</div>
+      <div class="check" id="tall-check">Running 33,000 px PNG stream…</div>
+      <div class="check" id="recovery-check">Running final-row recovery…</div>
+      <a id="preview-link" hidden>Open preview verification</a>
+      <img id="preview" alt="Processed area crop" hidden />
+    </main>
+
+    <script type="module">
+      await import("/dist/offscreen.js");
+
+      const invoke = (message) =>
+        new Promise((resolve) => {
+          window.__offscreenListener(message, {}, resolve);
+        });
+
+      const source = {
+        tabId: 1,
+        url: "https://example.com/demo",
+        title: "Pipeline fixture"
+      };
+
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 800;
+        canvas.height = 480;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#eff6ff";
+        context.fillRect(0, 0, 800, 480);
+        context.fillStyle = "#2563eb";
+        context.fillRect(80, 60, 240, 160);
+
+        const cropId = crypto.randomUUID();
+        const cropResponse = await invoke({
+          target: "offscreen",
+          type: "PROCESS_STILL",
+          jobId: cropId,
+          mode: "area",
+          dataUrl: canvas.toDataURL("image/png"),
+          rect: { x: 40, y: 30, width: 120, height: 80 },
+          viewport: { viewportWidth: 400, viewportHeight: 240 },
+          source
+        });
+        if (
+          !cropResponse.ok ||
+          cropResponse.data.width !== 240 ||
+          cropResponse.data.height !== 160
+        ) {
+          throw new Error(JSON.stringify(cropResponse));
+        }
+
+        const cropRecord = await readRecord(cropId);
+        document.getElementById("preview").src = URL.createObjectURL(cropRecord.blob);
+        document.getElementById("preview").hidden = false;
+        const previewLink = document.getElementById("preview-link");
+        previewLink.href = `/preview.html?id=${encodeURIComponent(cropId)}`;
+        previewLink.hidden = false;
+        pass("crop-check", "Area crop persisted at 240 × 160 px");
+      } catch (error) {
+        fail("crop-check", error);
+      }
+
+      try {
+        const tile = document.createElement("canvas");
+        tile.width = 2;
+        tile.height = 200;
+        const tileContext = tile.getContext("2d");
+        tileContext.fillStyle = "#2563eb";
+        tileContext.fillRect(0, 0, 2, 200);
+        const tileUrl = tile.toDataURL("image/png");
+        const fullId = crypto.randomUUID();
+
+        await assertOk(
+          invoke({
+            target: "offscreen",
+            type: "FULL_INIT",
+            jobId: fullId,
+            metrics: {
+              viewportWidth: 2,
+              viewportHeight: 200,
+              contentWidth: 2,
+              documentHeight: 33000
+            },
+            source
+          })
+        );
+
+        for (let y = 0; y < 33000; y += 200) {
+          await assertOk(
+            invoke({
+              target: "offscreen",
+              type: "FULL_TILE",
+              jobId: fullId,
+              dataUrl: tileUrl,
+              y
+            })
+          );
+        }
+
+        const fullResponse = await invoke({
+          target: "offscreen",
+          type: "FULL_FINISH",
+          jobId: fullId
+        });
+        if (
+          !fullResponse.ok ||
+          fullResponse.data.width !== 2 ||
+          fullResponse.data.height !== 33000
+        ) {
+          throw new Error(JSON.stringify(fullResponse));
+        }
+        const record = await readRecord(fullId);
+        const dimensions = await imageDimensions(record.blob);
+        if (dimensions.width !== 2 || dimensions.height !== 33000) {
+          throw new Error(`Decoded ${dimensions.width} × ${dimensions.height}`);
+        }
+        pass(
+          "tall-check",
+          `Single ${dimensions.width} × ${dimensions.height.toLocaleString()} PNG decoded successfully`
+        );
+      } catch (error) {
+        fail("tall-check", error);
+      }
+
+      try {
+        const tile = document.createElement("canvas");
+        tile.width = 2;
+        tile.height = 200;
+        const tileContext = tile.getContext("2d");
+        tileContext.fillStyle = "#16a34a";
+        tileContext.fillRect(0, 0, 2, 200);
+        const tileUrl = tile.toDataURL("image/png");
+        const recoveryId = crypto.randomUUID();
+
+        await assertOk(
+          invoke({
+            target: "offscreen",
+            type: "FULL_INIT",
+            jobId: recoveryId,
+            metrics: {
+              viewportWidth: 2,
+              viewportHeight: 200,
+              contentWidth: 2,
+              documentHeight: 601
+            },
+            source
+          })
+        );
+        for (const y of [0, 200, 400]) {
+          await assertOk(
+            invoke({
+              target: "offscreen",
+              type: "FULL_TILE",
+              jobId: recoveryId,
+              dataUrl: tileUrl,
+              y
+            })
+          );
+        }
+
+        const incomplete = await invoke({
+          target: "offscreen",
+          type: "FULL_STATUS",
+          jobId: recoveryId
+        });
+        if (
+          !incomplete.ok ||
+          incomplete.data.complete ||
+          incomplete.data.writtenRows !== 600 ||
+          incomplete.data.outputHeight !== 601
+        ) {
+          throw new Error(`Unexpected pre-recovery state: ${JSON.stringify(incomplete)}`);
+        }
+
+        const recovered = await invoke({
+          target: "offscreen",
+          type: "FULL_FINISH",
+          jobId: recoveryId
+        });
+        if (!recovered.ok || recovered.data.height !== 601) {
+          throw new Error(JSON.stringify(recovered));
+        }
+        const record = await readRecord(recoveryId);
+        const dimensions = await imageDimensions(record.blob);
+        if (dimensions.width !== 2 || dimensions.height !== 601) {
+          throw new Error(`Decoded ${dimensions.width} × ${dimensions.height}`);
+        }
+        pass("recovery-check", "One missing final row recovered into a valid 2 × 601 PNG");
+      } catch (error) {
+        fail("recovery-check", error);
+      }
+
+      function assertOk(promise) {
+        return promise.then((response) => {
+          if (!response.ok) {
+            throw new Error(JSON.stringify(response.error));
+          }
+          return response;
+        });
+      }
+
+      function readRecord(id) {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open("snapline", 1);
+          request.onsuccess = () => {
+            const recordRequest = request.result
+              .transaction("captures", "readonly")
+              .objectStore("captures")
+              .get(id);
+            recordRequest.onsuccess = () => resolve(recordRequest.result);
+            recordRequest.onerror = () => reject(recordRequest.error);
+          };
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      function imageDimensions(blob) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          const url = URL.createObjectURL(blob);
+          img.onload = () => {
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+            URL.revokeObjectURL(url);
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      }
+
+      function pass(id, message) {
+        const element = document.getElementById(id);
+        element.dataset.state = "pass";
+        element.textContent = message;
+      }
+
+      function fail(id, error) {
+        const element = document.getElementById(id);
+        element.dataset.state = "fail";
+        element.textContent = error instanceof Error ? error.message : String(error);
+      }
+    </script>
+  </body>
+</html>
