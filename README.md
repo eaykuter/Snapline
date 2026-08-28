@@ -90,3 +90,8 @@ framework-free TypeScript.
 - Continuously script-rendered Canvas or WebGL scenes have no generic settle
   signal, so Snapline captures the latest frame after a bounded wait.
 - Very large pages can exceed browser memory or downstream image-viewer limits.
+
+## License
+
+Copyright © 2026 Enes Aykuter. All rights reserved. The source is available for
+portfolio review only; see [`LICENSE`](LICENSE) for details.
