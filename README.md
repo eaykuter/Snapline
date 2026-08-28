@@ -93,5 +93,4 @@ framework-free TypeScript.
 
 ## License
 
-Copyright © 2026 Enes Aykuter. All rights reserved. The source is available for
-portfolio review only; see [`LICENSE`](LICENSE) for details.
+Copyright © 2026 Enes Aykuter. All rights reserved. See [`LICENSE`](LICENSE) for details.
